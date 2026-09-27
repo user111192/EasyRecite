@@ -2,6 +2,8 @@
 
 一个使用 React、TypeScript 和 Vite 构建的中英文背诵练习应用。
 
+在线访问：<https://user111192.github.io/EasyRecite/>
+
 ## 运行
 
 需要 Node.js 22.12+（或 24 LTS）。
@@ -18,6 +20,10 @@ npm test       # 文本对齐算法测试
 npm run build # TypeScript 检查和生产构建
 npm run preview
 ```
+
+## GitHub Pages
+
+推送到 `main` 后，`.github/workflows/deploy-pages.yml` 会运行测试、以 `/EasyRecite/` 为资源基础路径构建应用，并把 `dist` 发布到 GitHub Pages。本地开发仍使用根路径。首次部署前，请在 GitHub 仓库的 **Settings → Pages → Build and deployment → Source** 中选择 **GitHub Actions**。
 
 ## 功能
 
