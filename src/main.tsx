@@ -6,6 +6,7 @@ import {
   ArrowUpRight,
   ChevronRight,
   Plus,
+  Pencil,
   Check,
   Eye,
   EyeOff,
@@ -70,6 +71,7 @@ function App() {
     [transcript, setTranscript] = useState(""),
     [result, setResult] = useState<ReturnType<typeof compare> | null>(null),
     [modal, setModal] = useState(false),
+    [editingId, setEditingId] = useState<string | null>(null),
     [title, setTitle] = useState(""),
     [draft, setDraft] = useState(""),
     [notice, setNotice] = useState(""),
@@ -114,7 +116,16 @@ function App() {
     setHidden(false);
     setTab("practice");
   }
+  function openEditor(existing?: Passage) {
+    if (busy) return;
+    setEditingId(existing?.id ?? null);
+    setTitle(existing?.title ?? "");
+    setDraft(existing?.text ?? "");
+    setNotice("");
+    setModal(true);
+  }
   function save() {
+    if (busy) return;
     if (!title.trim() || !tokens(draft).length) {
       setNotice("请填写标题和有效的背诵文本。");
       return;
@@ -124,12 +135,16 @@ function App() {
       return;
     }
     const p = {
-      id: crypto.randomUUID(),
+      id: editingId ?? crypto.randomUUID(),
       title: title.trim(),
-      text: draft.trim(),
-      tag: "自定义",
+      text: draft,
+      tag: passages.find((p) => p.id === editingId)?.tag ?? "自定义",
     };
-    setPassages([...passages, p]);
+    setPassages((current) =>
+      editingId
+        ? current.map((item) => (item.id === editingId ? p : item))
+        : [...current, p],
+    );
     select(p.id);
     setModal(false);
     setTitle("");
@@ -190,7 +205,7 @@ function App() {
           我的文本{" "}
           <button
             aria-label="添加文本"
-            onClick={() => setModal(true)}
+            onClick={() => openEditor()}
             disabled={busy}
           >
             <Plus size={17} />
@@ -249,7 +264,7 @@ function App() {
               </div>
               <button
                 className="primary"
-                onClick={() => setModal(true)}
+                onClick={() => openEditor()}
                 disabled={busy}
               >
                 <Plus size={17} />
@@ -272,6 +287,15 @@ function App() {
                     >
                       开始练习
                       <ArrowUpRight size={15} />
+                    </button>
+                    <button
+                      className="icon-button"
+                      aria-label={`编辑${p.title}`}
+                      disabled={busy}
+                      onClick={() => openEditor(p)}
+                    >
+                      <Pencil size={16} />
+                      编辑
                     </button>
                     <button
                       className="icon-button"
@@ -315,6 +339,10 @@ function App() {
                   </div>
                   <div className="text-toolbar">
                     <span>{tokens(passage.text).length} 字 / 词</span>
+                    <button disabled={busy} onClick={() => openEditor(passage)}>
+                      <Pencil size={15} />
+                      编辑文本
+                    </button>
                     <button onClick={() => setHidden(!hidden)}>
                       {hidden ? <Eye size={15} /> : <EyeOff size={15} />}{" "}
                       {hidden ? "显示原文" : "隐藏原文"}
@@ -632,7 +660,9 @@ function App() {
             }}
           >
             <div className="card-header">
-              <h2 id="modal-title">新建背诵文本</h2>
+              <h2 id="modal-title">
+                {editingId ? "编辑背诵文本" : "新建背诵文本"}
+              </h2>
               <button
                 className="icon-button"
                 aria-label="关闭"
@@ -667,7 +697,7 @@ function App() {
               </p>
             )}
             <button className="primary" onClick={save}>
-              保存并开始练习
+              {editingId ? "保存修改" : "保存并开始练习"}
               <ArrowUpRight size={16} />
             </button>
           </section>
