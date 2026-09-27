@@ -1,0 +1,28 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { compare, tokens } from "./compare";
+test("忽略中文标点、英文大小写", () => {
+  assert.equal(compare("你好，世界！ Hello.", "你好世界 hello").score, 100);
+});
+test("漏背与多背不会使后续内容错位", () => {
+  assert.deepEqual(
+    compare("春眠不觉晓", "春眠觉晓").diff.map((d) => d.type),
+    ["correct", "correct", "missing", "correct", "correct"],
+  );
+  assert.equal(
+    compare("hello world", "hello beautiful world").diff[1].type,
+    "extra",
+  );
+});
+test("替换、空结果与重复词", () => {
+  assert.equal(compare("床前明月光", "床前明月亮").diff.at(-1)?.type, "wrong");
+  assert.equal(compare("hello", "").score, 0);
+  assert.equal(
+    compare("a a b", "a b").diff.filter((d) => d.type === "missing").length,
+    1,
+  );
+});
+test("中英混合按字和词切分；限制输入规模", () => {
+  assert.deepEqual(tokens("你好 React 19"), ["你", "好", "react", "19"]);
+  assert.throws(() => compare("你".repeat(2001), ""));
+});
