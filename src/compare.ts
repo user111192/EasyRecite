@@ -51,34 +51,104 @@ export function compare(expected: string, actual: string) {
     throw new Error("每次请控制在 2000 字 / 词以内。");
   const substitutionCost = (sourceIndex: number, spokenIndex: number) =>
     Number(a[sourceIndex] !== b[spokenIndex]);
-  const dp = Array.from(
+  const edits = Array.from(
     { length: a.length + 1 },
     () => new Uint16Array(b.length + 1),
   );
-  for (let i = 0; i <= a.length; i++) dp[i][0] = i;
-  for (let j = 0; j <= b.length; j++) dp[0][j] = j;
-  for (let i = 1; i <= a.length; i++)
-    for (let j = 1; j <= b.length; j++)
-      dp[i][j] = Math.min(
-        dp[i - 1][j] + 1,
-        dp[i][j - 1] + 1,
-        dp[i - 1][j - 1] + substitutionCost(i - 1, j - 1),
-      );
+  const matches = Array.from(
+    { length: a.length + 1 },
+    () => new Uint16Array(b.length + 1),
+  );
+  const distance = Array.from(
+    { length: a.length + 1 },
+    () => new Uint32Array(b.length + 1),
+  );
+  // 0: diagonal, 1: missing source token, 2: extra spoken token.
+  const move = Array.from(
+    { length: a.length + 1 },
+    () => new Uint8Array(b.length + 1),
+  );
+  for (let i = 1; i <= a.length; i++) {
+    edits[i][0] = i;
+    move[i][0] = 1;
+  }
+  for (let j = 1; j <= b.length; j++) {
+    edits[0][j] = j;
+    move[0][j] = 2;
+  }
+  const isBetter = (
+    candidateEdits: number,
+    candidateMatches: number,
+    candidateDistance: number,
+    bestEdits: number,
+    bestMatches: number,
+    bestDistance: number,
+  ) =>
+    candidateEdits < bestEdits ||
+    (candidateEdits === bestEdits &&
+      (candidateMatches > bestMatches ||
+        (candidateMatches === bestMatches &&
+          candidateDistance < bestDistance)));
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const equal = substitutionCost(i - 1, j - 1) === 0;
+      let bestEdits = edits[i - 1][j - 1] + Number(!equal);
+      let bestMatches = matches[i - 1][j - 1] + Number(equal);
+      let bestDistance =
+        distance[i - 1][j - 1] + (equal ? Math.abs(i - j) : 0);
+      let bestMove = 0;
+
+      const missingEdits = edits[i - 1][j] + 1;
+      if (
+        isBetter(
+          missingEdits,
+          matches[i - 1][j],
+          distance[i - 1][j],
+          bestEdits,
+          bestMatches,
+          bestDistance,
+        )
+      ) {
+        bestEdits = missingEdits;
+        bestMatches = matches[i - 1][j];
+        bestDistance = distance[i - 1][j];
+        bestMove = 1;
+      }
+
+      const extraEdits = edits[i][j - 1] + 1;
+      if (
+        isBetter(
+          extraEdits,
+          matches[i][j - 1],
+          distance[i][j - 1],
+          bestEdits,
+          bestMatches,
+          bestDistance,
+        )
+      ) {
+        bestEdits = extraEdits;
+        bestMatches = matches[i][j - 1];
+        bestDistance = distance[i][j - 1];
+        bestMove = 2;
+      }
+
+      edits[i][j] = bestEdits;
+      matches[i][j] = bestMatches;
+      distance[i][j] = bestDistance;
+      move[i][j] = bestMove;
+    }
+  }
   const diff: Diff[] = [];
   let i = a.length,
     j = b.length;
   while (i || j) {
-    if (
-      i &&
-      j &&
-      dp[i][j] === dp[i - 1][j - 1] + substitutionCost(i - 1, j - 1)
-    ) {
+    if (i && j && move[i][j] === 0) {
       diff.push({
         type: substitutionCost(i - 1, j - 1) === 0 ? "correct" : "wrong",
         expected: a[--i],
         actual: b[--j],
       });
-    } else if (i && dp[i][j] === dp[i - 1][j] + 1)
+    } else if (i && move[i][j] === 1)
       diff.push({ type: "missing", expected: a[--i], actual: "" });
     else diff.push({ type: "extra", expected: "", actual: b[--j] });
   }
@@ -115,7 +185,10 @@ export function compare(expected: string, actual: string) {
     diff,
     displayDiff,
     score: a.length
-      ? Math.max(0, Math.round((1 - dp[a.length][b.length] / a.length) * 100))
+      ? Math.max(
+          0,
+          Math.round((1 - edits[a.length][b.length] / a.length) * 100),
+        )
       : 0,
     total: a.length,
   };
