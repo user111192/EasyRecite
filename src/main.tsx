@@ -726,9 +726,13 @@ function App() {
                         <p>
                           准确率 · 漏背{" "}
                           {errors.filter((d) => d.type === "missing").length} ·
-                          错背 {errors.filter((d) => d.type === "wrong").length}{" "}
-                          · 多背{" "}
-                          {errors.filter((d) => d.type === "extra").length}
+                          错背 {errors.filter((d) => d.type === "wrong").length}
+                          {showExtra && (
+                            <>
+                              {" "}
+                              · 多背 {errors.filter((d) => d.type === "extra").length}
+                            </>
+                          )}
                         </p>
                       </div>
                       <button
