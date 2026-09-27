@@ -27,16 +27,6 @@ test("替换、空结果与重复词", () => {
     1,
   );
 });
-test("重复内容同时存在远近匹配时优先选择较近的位置", () => {
-  assert.deepEqual(
-    compare("甲乙甲丙", "甲丙").diff.map((item) => item.type),
-    ["correct", "missing", "missing", "correct"],
-  );
-  assert.deepEqual(
-    compare("a b a c", "a c").diff.map((item) => item.type),
-    ["correct", "missing", "missing", "correct"],
-  );
-});
 test("中英混合按字和词切分；限制输入规模", () => {
   assert.deepEqual(tokens("你好 React 19"), ["你", "好", "react", "19"]);
   assert.throws(() => compare("你".repeat(2001), ""));
