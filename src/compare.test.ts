@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { compare, liveDisplayDiff, matchSpanLimit, tokens } from "./compare";
+import {
+  compare,
+  liveDisplayDiff,
+  tokens,
+  visibleDisplayDiff,
+} from "./compare";
 test("忽略中文标点、英文大小写", () => {
   assert.equal(compare("你好，世界！ Hello.", "你好世界 hello").score, 100);
 });
@@ -55,16 +60,14 @@ test("实时结果截止到最后一个非漏背字符", () => {
   assert.deepEqual(liveDisplayDiff(compare("你好", "").displayDiff), []);
 });
 
-test("相同字词的位置跨度超过阈值时不算正确", () => {
-  assert.equal(matchSpanLimit(100), 20);
-  assert.equal(matchSpanLimit(401), 21);
-
-  const original = Array.from(
-    { length: 40 },
-    (_, index) => `word${index}`,
-  ).join(" ");
-  const shifted = `${Array.from({ length: 21 }, (_, index) => `extra${index}`).join(" ")} ${original}`;
-  const result = compare(original, shifted);
-  assert.equal(result.diff.filter((item) => item.type === "correct").length, 0);
-  assert.ok(result.score < 100);
+test("可以隐藏多背内容但不改变原始比对结果", () => {
+  const result = compare("你好", "你真的好");
+  assert.ok(result.displayDiff.some((item) => item.type === "extra"));
+  assert.equal(
+    visibleDisplayDiff(result.displayDiff, false).some(
+      (item) => item.type === "extra",
+    ),
+    false,
+  );
+  assert.ok(result.diff.some((item) => item.type === "extra"));
 });

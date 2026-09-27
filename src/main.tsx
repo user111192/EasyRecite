@@ -21,28 +21,44 @@ import {
   Info,
   Settings,
 } from "lucide-react";
-import { compare, liveDisplayDiff, tokens } from "./compare";
+import {
+  compare,
+  liveDisplayDiff,
+  tokens,
+  visibleDisplayDiff,
+} from "./compare";
 import { AiSettings, requestAiReview } from "./ai";
 import { useRecorder } from "./useRecorder";
 import "./style.css";
-type Passage = { id: string; title: string; text: string; tag: string };
+type Genre = "poetry" | "essay";
+type Passage = {
+  id: string;
+  title: string;
+  text: string;
+  tag: string;
+  genre: Genre;
+};
+const genreLabel: Record<Genre, string> = { poetry: "诗歌", essay: "作文" };
 const defaults: Passage[] = [
   {
     id: "1",
     title: "春江花月夜",
     tag: "古诗词",
+    genre: "poetry",
     text: "春江潮水连海平，海上明月共潮生。\n滟滟随波千万里，何处春江无月明！\n江流宛转绕芳甸，月照花林皆似霰。\n空里流霜不觉飞，汀上白沙看不见。",
   },
   {
     id: "2",
     title: "静夜思",
     tag: "古诗词",
+    genre: "poetry",
     text: "床前明月光，疑是地上霜。\n举头望明月，低头思故乡。",
   },
   {
     id: "3",
     title: "The Road Not Taken",
     tag: "English",
+    genre: "poetry",
     text: "Two roads diverged in a yellow wood,\nAnd sorry I could not travel both\nAnd be one traveler, long I stood\nAnd looked down one as far as I could\nTo where it bent in the undergrowth;",
   },
 ];
@@ -61,7 +77,15 @@ function App() {
             typeof p.text === "string" &&
             typeof p.tag === "string",
         )
-        ? saved
+        ? saved.map((p) => ({
+            ...p,
+            genre:
+              p.genre === "poetry" || p.genre === "essay"
+                ? p.genre
+                : p.tag === "古诗词" || p.tag === "English"
+                  ? "poetry"
+                  : "essay",
+          }))
         : defaults;
     } catch {
       return defaults;
@@ -76,6 +100,7 @@ function App() {
     [editingId, setEditingId] = useState<string | null>(null),
     [title, setTitle] = useState(""),
     [draft, setDraft] = useState(""),
+    [draftGenre, setDraftGenre] = useState<Genre>("poetry"),
     [notice, setNotice] = useState(""),
     [manual, setManual] = useState(false),
     [aiModal, setAiModal] = useState(false),
@@ -110,6 +135,13 @@ function App() {
       return localStorage.getItem("easyrecite-live-diff") === "true";
     } catch {
       return false;
+    }
+  });
+  const [showExtra, setShowExtra] = useState(() => {
+    try {
+      return localStorage.getItem("easyrecite-show-extra") !== "false";
+    } catch {
+      return true;
     }
   });
   const passage = passages.find((p) => p.id === selected) || passages[0];
@@ -153,6 +185,7 @@ function App() {
     setEditingId(existing?.id ?? null);
     setTitle(existing?.title ?? "");
     setDraft(existing?.text ?? "");
+    setDraftGenre(existing?.genre ?? "poetry");
     setNotice("");
     setModal(true);
   }
@@ -170,7 +203,8 @@ function App() {
       id: editingId ?? crypto.randomUUID(),
       title: title.trim(),
       text: draft,
-      tag: passages.find((p) => p.id === editingId)?.tag ?? "自定义",
+      tag: genreLabel[draftGenre],
+      genre: draftGenre,
     };
     setPassages((current) =>
       editingId
@@ -206,13 +240,16 @@ function App() {
       ? liveComparison.result
       : result;
   const isLivePreview = Boolean(liveDiff && liveComparison.result && !result);
-  const visibleDiff = visibleResult
+  const fullVisibleDiff = visibleResult
     ? isLivePreview
       ? liveDisplayDiff(visibleResult.displayDiff)
       : visibleResult.displayDiff
     : [];
+  const visibleDiff = visibleDisplayDiff(fullVisibleDiff, showExtra);
   const errors = isLivePreview
-    ? visibleDiff.filter((d) => d.type !== "correct" && d.type !== "ignored")
+    ? fullVisibleDiff.filter(
+        (d) => d.type !== "correct" && d.type !== "ignored",
+      )
     : visibleResult?.diff.filter((d) => d.type !== "correct") || [];
 
   function saveAiSettings() {
@@ -249,6 +286,7 @@ function App() {
     setAiReview("");
     try {
       const review = await requestAiReview(aiSettings, {
+        genre: passage.genre,
         title: passage.title,
         original: passage.text,
         transcript,
@@ -382,7 +420,7 @@ function App() {
             <div className="library">
               {passages.map((p) => (
                 <article className="card library-card" key={p.id}>
-                  <span className="tag">{p.tag}</span>
+                  <span className="tag">{genreLabel[p.genre]}</span>
                   <h2>{p.title}</h2>
                   <p>{p.text}</p>
                   <div>
@@ -441,7 +479,7 @@ function App() {
                       <FileText size={18} />
                       背诵文本
                     </h2>
-                    <span className="tag">{passage.tag}</span>
+                    <span className="tag">{genreLabel[passage.genre]}</span>
                   </div>
                   <div className="text-toolbar">
                     <span>{tokens(passage.text).length} 字 / 词</span>
@@ -596,6 +634,25 @@ function App() {
                     />
                     实时显示差异
                   </label>
+                  <label className="live-toggle extra-toggle">
+                    <input
+                      type="checkbox"
+                      role="switch"
+                      checked={showExtra}
+                      onChange={(event) => {
+                        setShowExtra(event.target.checked);
+                        try {
+                          localStorage.setItem(
+                            "easyrecite-show-extra",
+                            String(event.target.checked),
+                          );
+                        } catch {
+                          /* The setting still works for this visit. */
+                        }
+                      }}
+                    />
+                    显示多背内容
+                  </label>
                   <p>
                     {liveDiff
                       ? "随识别或输入更新；只展示到当前最后一个已背字词，录音中的结果仅供参考。"
@@ -706,12 +763,10 @@ function App() {
                       <span>绿色：正确</span>
                       <span>橙色：漏背</span>
                       <span>红色：错背（划线为实际内容）</span>
-                      <span>紫色：多背</span>
+                      {showExtra && <span>紫色：多背</span>}
                     </div>
                     <p className="result-note">
                       保留原文标点、空格和换行，但不参与比较；忽略英文大小写，中文按字、英文按词比较。识别结果可能有误，可手动修正后重新检查。
-                      相同字词的位置跨度超过原文的 5% 或 20
-                      个字词（取较大值）时，也会按错误处理。
                     </p>
                     {!isLivePreview && result && (
                       <div className="ai-review">
@@ -721,7 +776,9 @@ function App() {
                               <Sparkles size={17} /> AI 锐评
                             </h3>
                             <p>
-                              把原文、转写和文字比对结果发送到你配置的 API。
+                              按{genreLabel[passage.genre]}
+                              标准分析每处错误，并把原文、转写和比对结果发送到你配置的
+                              API。
                             </p>
                           </div>
                           <button
@@ -823,6 +880,16 @@ function App() {
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="给这段文字起个名字"
               />
+            </label>
+            <label>
+              文体
+              <select
+                value={draftGenre}
+                onChange={(event) => setDraftGenre(event.target.value as Genre)}
+              >
+                <option value="poetry">诗歌</option>
+                <option value="essay">作文</option>
+              </select>
             </label>
             <label>
               背诵内容

@@ -23,6 +23,7 @@ test("发送兼容 Chat Completions 的请求并读取结果", async () => {
       model: "demo",
     },
     {
+      genre: "poetry",
       title: "测试",
       original: "你好",
       transcript: "你号",
@@ -50,6 +51,7 @@ test("显示兼容 API 返回的错误信息", async () => {
       requestAiReview(
         { endpoint: "https://example.com/api", apiKey: "", model: "missing" },
         {
+          genre: "essay",
           title: "测试",
           original: "你好",
           transcript: "你好",

@@ -33,8 +33,13 @@ export function liveDisplayDiff(displayDiff: DisplayDiff[]) {
   return lastProgress < 0 ? [] : displayDiff.slice(0, lastProgress + 1);
 }
 
-export function matchSpanLimit(sourceLength: number) {
-  return Math.max(Math.ceil(sourceLength * 0.05), 20);
+export function visibleDisplayDiff(
+  displayDiff: DisplayDiff[],
+  showExtra: boolean,
+) {
+  return showExtra
+    ? displayDiff
+    : displayDiff.filter((item) => item.type !== "extra");
 }
 
 export function compare(expected: string, actual: string) {
@@ -44,12 +49,8 @@ export function compare(expected: string, actual: string) {
     b = spoken.map((s) => s.key);
   if (a.length > 2000 || b.length > 2000)
     throw new Error("每次请控制在 2000 字 / 词以内。");
-  const spanLimit = matchSpanLimit(a.length);
   const substitutionCost = (sourceIndex: number, spokenIndex: number) =>
-    Number(
-      a[sourceIndex] !== b[spokenIndex] ||
-        Math.abs(sourceIndex - spokenIndex) > spanLimit,
-    );
+    Number(a[sourceIndex] !== b[spokenIndex]);
   const dp = Array.from(
     { length: a.length + 1 },
     () => new Uint16Array(b.length + 1),
