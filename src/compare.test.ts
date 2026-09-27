@@ -52,12 +52,23 @@ test("错误对齐后仍完整保留原文，实际词保留大小写", () => {
   assert.equal(compare("，\n！", "").displayDiff[0].expected, "，\n！");
 });
 
-test("实时结果截止到最后一个非漏背字符", () => {
+test("实时结果截止到最后一个正确字符", () => {
   const result = compare("你好，世界！\n明天见。", "你好世");
   const visible = liveDisplayDiff(result.displayDiff);
   assert.equal(visible.map((d) => d.expected).join(""), "你好，世");
   assert.equal(visible.at(-1)?.type, "correct");
+  assert.equal(
+    liveDisplayDiff(compare("你好，世界", "你好错").displayDiff)
+      .map((d) => d.expected)
+      .join(""),
+    "你好",
+  );
+  assert.equal(
+    liveDisplayDiff(compare("你好", "你好错").displayDiff).at(-1)?.type,
+    "correct",
+  );
   assert.deepEqual(liveDisplayDiff(compare("你好", "").displayDiff), []);
+  assert.deepEqual(liveDisplayDiff(compare("你好", "错").displayDiff), []);
 });
 
 test("可以隐藏多背内容但不改变原始比对结果", () => {

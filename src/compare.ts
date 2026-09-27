@@ -22,15 +22,14 @@ export type DisplayDiff = Omit<Diff, "type"> & {
 };
 
 export function liveDisplayDiff(displayDiff: DisplayDiff[]) {
-  let lastProgress = -1;
+  let lastCorrect = -1;
   for (let index = displayDiff.length - 1; index >= 0; index--) {
-    const item = displayDiff[index];
-    if (item.type !== "missing" && item.type !== "ignored") {
-      lastProgress = index;
+    if (displayDiff[index].type === "correct") {
+      lastCorrect = index;
       break;
     }
   }
-  return lastProgress < 0 ? [] : displayDiff.slice(0, lastProgress + 1);
+  return lastCorrect < 0 ? [] : displayDiff.slice(0, lastCorrect + 1);
 }
 
 export function visibleDisplayDiff(
