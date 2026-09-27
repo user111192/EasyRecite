@@ -20,6 +20,18 @@ export function tokens(text: string) {
 export type DisplayDiff = Omit<Diff, "type"> & {
   type: Diff["type"] | "ignored";
 };
+
+export function liveDisplayDiff(displayDiff: DisplayDiff[]) {
+  let lastProgress = -1;
+  for (let index = displayDiff.length - 1; index >= 0; index--) {
+    const item = displayDiff[index];
+    if (item.type !== "missing" && item.type !== "ignored") {
+      lastProgress = index;
+      break;
+    }
+  }
+  return lastProgress < 0 ? [] : displayDiff.slice(0, lastProgress + 1);
+}
 export function compare(expected: string, actual: string) {
   const source = segments(expected),
     spoken = segments(actual);

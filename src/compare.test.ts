@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { compare, tokens } from "./compare";
+import { compare, liveDisplayDiff, tokens } from "./compare";
 test("忽略中文标点、英文大小写", () => {
   assert.equal(compare("你好，世界！ Hello.", "你好世界 hello").score, 100);
 });
@@ -45,4 +45,12 @@ test("错误对齐后仍完整保留原文，实际词保留大小写", () => {
   assert.equal(result.displayDiff.map((d) => d.expected).join(""), original);
   assert.ok(result.displayDiff.some((d) => d.actual === "Beautiful"));
   assert.equal(compare("，\n！", "").displayDiff[0].expected, "，\n！");
+});
+
+test("实时结果截止到最后一个非漏背字符", () => {
+  const result = compare("你好，世界！\n明天见。", "你好世");
+  const visible = liveDisplayDiff(result.displayDiff);
+  assert.equal(visible.map((d) => d.expected).join(""), "你好，世");
+  assert.equal(visible.at(-1)?.type, "correct");
+  assert.deepEqual(liveDisplayDiff(compare("你好", "").displayDiff), []);
 });

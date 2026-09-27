@@ -1108,3 +1108,100 @@ textarea {
   font-size: 11px;
   line-height: 1.8;
 }
+
+.header-actions,
+.ai-review-heading,
+.ai-review-heading h3 {
+  display: flex;
+  align-items: center;
+}
+.header-actions {
+  gap: 16px;
+}
+.settings-button {
+  color: #727e96;
+  font-size: 10px;
+  padding: 7px 9px;
+  border: 1px solid #e5e9f2;
+  border-radius: 7px;
+  background: #fff;
+}
+.ai-review {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #edf0f6;
+}
+.ai-review-heading {
+  justify-content: space-between;
+  gap: 20px;
+}
+.ai-review-heading h3 {
+  gap: 8px;
+  margin: 0 0 6px;
+  color: #5f6ec8;
+}
+.ai-review-heading p {
+  margin: 0;
+  color: #929db0;
+  font-size: 10px;
+}
+.ai-review-content {
+  margin-top: 16px;
+  padding: 17px 18px;
+  white-space: pre-wrap;
+  line-height: 1.9;
+  color: #58667f;
+  background: linear-gradient(135deg, #f5f6ff, #fafaff);
+  border: 1px solid #e6e9fa;
+  border-radius: 9px;
+}
+.ai-error {
+  color: #ad5f58;
+  font-size: 11px;
+}
+.ai-error button {
+  color: #6876df;
+  text-decoration: underline;
+  padding: 0;
+}
+.ai-modal label {
+  display: block;
+  margin-top: 18px;
+  color: #7f8ba1;
+  font-size: 12px;
+}
+.ai-modal input {
+  margin-top: 9px;
+}
+.api-privacy-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 18px 0;
+  padding: 12px;
+  color: #7e899f;
+  background: #f7f8fc;
+  border-radius: 7px;
+  font-size: 10px;
+  line-height: 1.7;
+}
+.api-privacy-note svg {
+  flex: none;
+  margin-top: 1px;
+}
+.ai-modal > .primary {
+  width: 100%;
+}
+
+@media (max-width: 600px) {
+  .local-badge {
+    display: none;
+  }
+  .header-actions {
+    gap: 0;
+  }
+  .ai-review-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

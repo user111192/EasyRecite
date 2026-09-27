@@ -7,7 +7,7 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "node --import tsx --test src/compare.test.ts"
+    "test": "node --import tsx --test src/*.test.ts"
   },
   "dependencies": {
     "react": "^19.1.0",

@@ -19,8 +19,10 @@ import {
   Trash2,
   Languages,
   Info,
+  Settings,
 } from "lucide-react";
-import { compare, tokens } from "./compare";
+import { compare, liveDisplayDiff, tokens } from "./compare";
+import { AiSettings, requestAiReview } from "./ai";
 import { useRecorder } from "./useRecorder";
 import "./style.css";
 type Passage = { id: string; title: string; text: string; tag: string };
@@ -76,7 +78,33 @@ function App() {
     [draft, setDraft] = useState(""),
     [notice, setNotice] = useState(""),
     [manual, setManual] = useState(false),
+    [aiModal, setAiModal] = useState(false),
+    [aiReview, setAiReview] = useState(""),
+    [aiError, setAiError] = useState(""),
+    [aiLoading, setAiLoading] = useState(false),
     [tab, setTab] = useState<"practice" | "library">("practice");
+  const [aiSettings, setAiSettings] = useState<AiSettings>(() => {
+    try {
+      const saved = JSON.parse(
+        localStorage.getItem("easyrecite-ai-settings") || "{}",
+      );
+      return {
+        endpoint:
+          typeof saved.endpoint === "string"
+            ? saved.endpoint
+            : "https://api.openai.com/v1/chat/completions",
+        model: typeof saved.model === "string" ? saved.model : "gpt-4.1-mini",
+        apiKey: sessionStorage.getItem("easyrecite-ai-key") || "",
+      };
+    } catch {
+      return {
+        endpoint: "https://api.openai.com/v1/chat/completions",
+        model: "gpt-4.1-mini",
+        apiKey: "",
+      };
+    }
+  });
+  const [aiDraft, setAiDraft] = useState<AiSettings>(aiSettings);
   const [liveDiff, setLiveDiff] = useState(() => {
     try {
       return localStorage.getItem("easyrecite-live-diff") === "true";
@@ -94,6 +122,8 @@ function App() {
     }
     try {
       setResult(compare(passage.text, text));
+      setAiReview("");
+      setAiError("");
       setNotice("");
     } catch (e) {
       setNotice((e as Error).message);
@@ -113,6 +143,8 @@ function App() {
     setSelected(id);
     setTranscript("");
     setResult(null);
+    setAiReview("");
+    setAiError("");
     setHidden(false);
     setTab("practice");
   }
@@ -173,7 +205,76 @@ function App() {
     : liveDiff
       ? liveComparison.result
       : result;
-  const errors = visibleResult?.diff.filter((d) => d.type !== "correct") || [];
+  const isLivePreview = Boolean(liveDiff && liveComparison.result && !result);
+  const visibleDiff = visibleResult
+    ? isLivePreview
+      ? liveDisplayDiff(visibleResult.displayDiff)
+      : visibleResult.displayDiff
+    : [];
+  const errors = isLivePreview
+    ? visibleDiff.filter((d) => d.type !== "correct" && d.type !== "ignored")
+    : visibleResult?.diff.filter((d) => d.type !== "correct") || [];
+
+  function saveAiSettings() {
+    try {
+      localStorage.setItem(
+        "easyrecite-ai-settings",
+        JSON.stringify({
+          endpoint: aiDraft.endpoint.trim(),
+          model: aiDraft.model.trim(),
+        }),
+      );
+      sessionStorage.setItem("easyrecite-ai-key", aiDraft.apiKey);
+      setAiSettings({
+        ...aiDraft,
+        endpoint: aiDraft.endpoint.trim(),
+        model: aiDraft.model.trim(),
+      });
+      setAiModal(false);
+      setAiError("");
+    } catch {
+      setAiError("浏览器无法保存 API 配置，但本次页面仍可继续使用。");
+    }
+  }
+
+  function openAiSettings() {
+    setAiDraft(aiSettings);
+    setAiModal(true);
+  }
+
+  async function generateAiReview() {
+    if (!result || aiLoading) return;
+    setAiLoading(true);
+    setAiError("");
+    setAiReview("");
+    try {
+      const review = await requestAiReview(aiSettings, {
+        title: passage.title,
+        original: passage.text,
+        transcript,
+        score: result.score,
+        missing: result.diff
+          .filter((item) => item.type === "missing")
+          .map((item) => item.expected),
+        wrong: result.diff
+          .filter((item) => item.type === "wrong")
+          .map((item) => ({ expected: item.expected, actual: item.actual })),
+        extra: result.diff
+          .filter((item) => item.type === "extra")
+          .map((item) => item.actual),
+      });
+      setAiReview(review);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "AI 请求失败。";
+      setAiError(
+        message === "Failed to fetch"
+          ? "无法连接 API。请检查地址、网络和服务端 CORS 设置。"
+          : message,
+      );
+    } finally {
+      setAiLoading(false);
+    }
+  }
   return (
     <div className="app">
       <aside>
@@ -246,9 +347,14 @@ function App() {
             学习空间 <ChevronRight size={13} />{" "}
             <strong>{tab === "practice" ? "背诵练习" : "我的文本库"}</strong>
           </div>
-          <span className="local-badge">
-            <span /> 文本保存在本地
-          </span>
+          <div className="header-actions">
+            <span className="local-badge">
+              <span /> 文本保存在本地
+            </span>
+            <button className="settings-button" onClick={openAiSettings}>
+              <Settings size={15} /> AI 设置
+            </button>
+          </div>
         </header>
         <main>
           <div className="page-heading">
@@ -492,7 +598,7 @@ function App() {
                   </label>
                   <p>
                     {liveDiff
-                      ? "随识别或输入更新；录音中的结果仅供参考，尚未背到的内容也会标为漏背。"
+                      ? "随识别或输入更新；只展示到当前最后一个已背字词，录音中的结果仅供参考。"
                       : "录音结束后自动显示差异，手动输入时点击「检查背诵」。"}
                   </p>
                   {liveDiff && liveComparison.error && (
@@ -537,12 +643,12 @@ function App() {
                   <div className="result">
                     <div className="score">
                       <strong>
-                        {visibleResult.score}
-                        <small>%</small>
+                        {isLivePreview ? "—" : visibleResult.score}
+                        {!isLivePreview && <small>%</small>}
                       </strong>
                       <div>
                         <h3>
-                          {busy
+                          {isLivePreview
                             ? "实时对照 · 等待背诵完成"
                             : visibleResult.score === 100
                               ? "太棒了，背诵完全正确！"
@@ -569,7 +675,7 @@ function App() {
                       </button>
                     </div>
                     <div className="diff">
-                      {visibleResult.displayDiff.map((d, i) => (
+                      {visibleDiff.map((d, i) => (
                         <span
                           key={i}
                           className={d.type}
@@ -605,6 +711,41 @@ function App() {
                     <p className="result-note">
                       保留原文标点、空格和换行，但不参与比较；忽略英文大小写，中文按字、英文按词比较。识别结果可能有误，可手动修正后重新检查。
                     </p>
+                    {!isLivePreview && result && (
+                      <div className="ai-review">
+                        <div className="ai-review-heading">
+                          <div>
+                            <h3>
+                              <Sparkles size={17} /> AI 锐评
+                            </h3>
+                            <p>
+                              把原文、转写和文字比对结果发送到你配置的 API。
+                            </p>
+                          </div>
+                          <button
+                            className="primary"
+                            disabled={aiLoading}
+                            onClick={generateAiReview}
+                          >
+                            <Sparkles size={15} />
+                            {aiLoading
+                              ? "正在锐评…"
+                              : aiReview
+                                ? "重新锐评"
+                                : "让 AI 锐评一下"}
+                          </button>
+                        </div>
+                        {aiError && (
+                          <p className="ai-error" role="alert">
+                            {aiError}{" "}
+                            <button onClick={openAiSettings}>检查设置</button>
+                          </p>
+                        )}
+                        {aiReview && (
+                          <div className="ai-review-content">{aiReview}</div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   !busy &&
@@ -699,6 +840,94 @@ function App() {
             <button className="primary" onClick={save}>
               {editingId ? "保存修改" : "保存并开始练习"}
               <ArrowUpRight size={16} />
+            </button>
+          </section>
+        </div>
+      )}
+      {aiModal && (
+        <div className="overlay" onClick={() => setAiModal(false)}>
+          <section
+            className="modal card ai-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="ai-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="card-header">
+              <h2 id="ai-modal-title">
+                <Settings size={18} /> AI API 设置
+              </h2>
+              <button
+                className="icon-button"
+                aria-label="关闭 AI 设置"
+                onClick={() => setAiModal(false)}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <label>
+              Chat Completions API 地址
+              <input
+                autoFocus
+                type="url"
+                value={aiDraft.endpoint}
+                onChange={(event) =>
+                  setAiDraft((current) => ({
+                    ...current,
+                    endpoint: event.target.value,
+                  }))
+                }
+                placeholder="https://example.com/v1/chat/completions"
+              />
+            </label>
+            <label>
+              模型名称
+              <input
+                value={aiDraft.model}
+                onChange={(event) =>
+                  setAiDraft((current) => ({
+                    ...current,
+                    model: event.target.value,
+                  }))
+                }
+                placeholder="模型 ID"
+              />
+            </label>
+            <label>
+              API Key（可留空）
+              <input
+                type="password"
+                autoComplete="off"
+                value={aiDraft.apiKey}
+                onChange={(event) =>
+                  setAiDraft((current) => ({
+                    ...current,
+                    apiKey: event.target.value,
+                  }))
+                }
+                placeholder="sk-…"
+              />
+            </label>
+            <div className="api-privacy-note">
+              <Info size={16} />
+              <span>
+                API Key
+                仅保存在当前标签页；地址和模型保存在本地。生成锐评时，原文、识别内容和错误结果会直接发送到该
+                API。服务端必须允许浏览器跨域请求。
+              </span>
+            </div>
+            {aiError && (
+              <p className="form-error" role="alert">
+                {aiError}
+              </p>
+            )}
+            <button
+              className="primary"
+              disabled={!aiDraft.endpoint.trim() || !aiDraft.model.trim()}
+              onClick={saveAiSettings}
+            >
+              保存 AI 设置
+              <Check size={16} />
             </button>
           </section>
         </div>
