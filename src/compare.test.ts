@@ -26,3 +26,23 @@ test("中英混合按字和词切分；限制输入规模", () => {
   assert.deepEqual(tokens("你好 React 19"), ["你", "好", "react", "19"]);
   assert.throws(() => compare("你".repeat(2001), ""));
 });
+
+test("结果保留原文标点、空白、换行和大小写而不影响评分", () => {
+  const original = " 你好，世界！\nHello,  WORLD.\t";
+  const result = compare(original, "你好世界 hello world");
+  assert.equal(result.score, 100);
+  assert.equal(result.displayDiff.map((d) => d.expected).join(""), original);
+  assert.ok(
+    result.displayDiff.some(
+      (d) => d.type === "ignored" && d.expected.includes("\n"),
+    ),
+  );
+  assert.equal(result.diff.filter((d) => d.type !== "correct").length, 0);
+});
+test("错误对齐后仍完整保留原文，实际词保留大小写", () => {
+  const original = "Hello, world!\n再见。";
+  const result = compare(original, "Hello Beautiful earth 再");
+  assert.equal(result.displayDiff.map((d) => d.expected).join(""), original);
+  assert.ok(result.displayDiff.some((d) => d.actual === "Beautiful"));
+  assert.equal(compare("，\n！", "").displayDiff[0].expected, "，\n！");
+});

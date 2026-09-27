@@ -1066,3 +1066,45 @@ textarea {
     transition: none !important;
   }
 }
+
+/* Preserve prose layout, including all non-scoring characters. */
+.diff {
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 2.2;
+}
+.diff > span {
+  padding: 2px 1px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.diff > .ignored {
+  padding: 0;
+  color: #8792a5;
+  background: none;
+}
+.feedback-settings {
+  padding: 16px 24px;
+  border-bottom: 1px solid #eff1f6;
+}
+.live-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.live-toggle input {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #6876df;
+}
+.feedback-settings p {
+  margin: 8px 0 0;
+  color: #8792a5;
+  font-size: 11px;
+  line-height: 1.8;
+}

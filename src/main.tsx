@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   BookOpen,
@@ -75,6 +75,13 @@ function App() {
     [notice, setNotice] = useState(""),
     [manual, setManual] = useState(false),
     [tab, setTab] = useState<"practice" | "library">("practice");
+  const [liveDiff, setLiveDiff] = useState(() => {
+    try {
+      return localStorage.getItem("easyrecite-live-diff") === "true";
+    } catch {
+      return false;
+    }
+  });
   const passage = passages.find((p) => p.id === selected) || passages[0];
   const detected = /\p{Script=Han}/u.test(passage.text) ? "zh-CN" : "en-US";
   const lang = language === "auto" ? detected : language;
@@ -129,7 +136,29 @@ function App() {
     setDraft("");
     setNotice("");
   }
-  const errors = result?.diff.filter((d) => d.type !== "correct") || [];
+  const liveComparison = useMemo(() => {
+    if (!liveDiff || !(transcript + recording.interim).trim())
+      return { result: null, error: "" };
+    try {
+      return {
+        result: compare(
+          passage.text,
+          [transcript, recording.interim].filter(Boolean).join(" "),
+        ),
+        error: "",
+      };
+    } catch (error) {
+      return { result: null, error: (error as Error).message };
+    }
+  }, [liveDiff, transcript, recording.interim, passage.text]);
+  const visibleResult = busy
+    ? liveDiff
+      ? liveComparison.result
+      : null
+    : liveDiff
+      ? liveComparison.result
+      : result;
+  const errors = visibleResult?.diff.filter((d) => d.type !== "correct") || [];
   return (
     <div className="app">
       <aside>
@@ -413,6 +442,35 @@ function App() {
                     <ChevronRight size={14} />
                   </button>
                 </div>
+                <div className="feedback-settings">
+                  <label className="live-toggle">
+                    <input
+                      type="checkbox"
+                      role="switch"
+                      checked={liveDiff}
+                      onChange={(e) => {
+                        setLiveDiff(e.target.checked);
+                        try {
+                          localStorage.setItem(
+                            "easyrecite-live-diff",
+                            String(e.target.checked),
+                          );
+                        } catch {
+                          /* The setting still works for this visit. */
+                        }
+                      }}
+                    />
+                    实时显示差异
+                  </label>
+                  <p>
+                    {liveDiff
+                      ? "随识别或输入更新；录音中的结果仅供参考，尚未背到的内容也会标为漏背。"
+                      : "录音结束后自动显示差异，手动输入时点击「检查背诵」。"}
+                  </p>
+                  {liveDiff && liveComparison.error && (
+                    <p role="alert">{liveComparison.error}</p>
+                  )}
+                </div>
                 {(busy || transcript) && (
                   <div className="transcript">
                     <span className="eyebrow">识别内容</span>
@@ -447,18 +505,20 @@ function App() {
                     </button>
                   </div>
                 )}
-                {result ? (
+                {visibleResult ? (
                   <div className="result">
                     <div className="score">
                       <strong>
-                        {result.score}
+                        {visibleResult.score}
                         <small>%</small>
                       </strong>
                       <div>
                         <h3>
-                          {result.score === 100
-                            ? "太棒了，背诵完全正确！"
-                            : "每次练习，都更进一步"}
+                          {busy
+                            ? "实时对照 · 等待背诵完成"
+                            : visibleResult.score === 100
+                              ? "太棒了，背诵完全正确！"
+                              : "每次练习，都更进一步"}
                         </h3>
                         <p>
                           准确率 · 漏背{" "}
@@ -481,7 +541,7 @@ function App() {
                       </button>
                     </div>
                     <div className="diff">
-                      {result.diff.map((d, i) => (
+                      {visibleResult.displayDiff.map((d, i) => (
                         <span
                           key={i}
                           className={d.type}
@@ -492,7 +552,9 @@ function App() {
                                 ? "漏背"
                                 : d.type === "extra"
                                   ? "多背"
-                                  : "正确"
+                                  : d.type === "ignored"
+                                    ? "仅展示，不参与比较"
+                                    : "正确"
                           }
                         >
                           {d.type === "wrong" ? (
@@ -513,7 +575,7 @@ function App() {
                       <span>紫色：多背</span>
                     </div>
                     <p className="result-note">
-                      忽略标点与英文大小写；中文按字、英文按词比较。识别结果可能有误，可手动修正后重新检查。
+                      保留原文标点、空格和换行，但不参与比较；忽略英文大小写，中文按字、英文按词比较。识别结果可能有误，可手动修正后重新检查。
                     </p>
                   </div>
                 ) : (

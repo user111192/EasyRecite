@@ -3,17 +3,28 @@ export type Diff = {
   expected: string;
   actual: string;
 };
-export function tokens(text: string) {
-  return (
-    text
-      .normalize("NFKC")
-      .toLowerCase()
-      .match(/\p{Script=Han}|[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu) ?? []
-  );
+// Keep source offsets separately from normalized comparison keys.
+function segments(text: string) {
+  return [
+    ...text.matchAll(/\p{Script=Han}|[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu),
+  ].map((match) => ({
+    text: match[0],
+    key: match[0].normalize("NFKC").toLowerCase(),
+    start: match.index!,
+    end: match.index! + match[0].length,
+  }));
 }
+export function tokens(text: string) {
+  return segments(text).map((segment) => segment.key);
+}
+export type DisplayDiff = Omit<Diff, "type"> & {
+  type: Diff["type"] | "ignored";
+};
 export function compare(expected: string, actual: string) {
-  const a = tokens(expected),
-    b = tokens(actual);
+  const source = segments(expected),
+    spoken = segments(actual);
+  const a = source.map((s) => s.key),
+    b = spoken.map((s) => s.key);
   if (a.length > 2000 || b.length > 2000)
     throw new Error("每次请控制在 2000 字 / 词以内。");
   const dp = Array.from(
@@ -47,8 +58,38 @@ export function compare(expected: string, actual: string) {
       diff.push({ type: "missing", expected: a[--i], actual: "" });
     else diff.push({ type: "extra", expected: "", actual: b[--j] });
   }
+  diff.reverse();
+  const displayDiff: DisplayDiff[] = [];
+  let sourceIndex = 0,
+    spokenIndex = 0,
+    cursor = 0;
+  for (const item of diff) {
+    const original = item.type !== "extra" ? source[sourceIndex++] : undefined;
+    const said = item.type !== "missing" ? spoken[spokenIndex++] : undefined;
+    if (original) {
+      if (original.start > cursor)
+        displayDiff.push({
+          type: "ignored",
+          expected: expected.slice(cursor, original.start),
+          actual: "",
+        });
+      cursor = original.end;
+    }
+    displayDiff.push({
+      ...item,
+      expected: original?.text ?? "",
+      actual: said?.text ?? "",
+    });
+  }
+  if (cursor < expected.length)
+    displayDiff.push({
+      type: "ignored",
+      expected: expected.slice(cursor),
+      actual: "",
+    });
   return {
-    diff: diff.reverse(),
+    diff,
+    displayDiff,
     score: a.length
       ? Math.max(0, Math.round((1 - dp[a.length][b.length] / a.length) * 100))
       : 0,
