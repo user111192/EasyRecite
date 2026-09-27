@@ -32,6 +32,11 @@ export function liveDisplayDiff(displayDiff: DisplayDiff[]) {
   }
   return lastProgress < 0 ? [] : displayDiff.slice(0, lastProgress + 1);
 }
+
+export function matchSpanLimit(sourceLength: number) {
+  return Math.max(Math.ceil(sourceLength * 0.05), 20);
+}
+
 export function compare(expected: string, actual: string) {
   const source = segments(expected),
     spoken = segments(actual);
@@ -39,6 +44,12 @@ export function compare(expected: string, actual: string) {
     b = spoken.map((s) => s.key);
   if (a.length > 2000 || b.length > 2000)
     throw new Error("每次请控制在 2000 字 / 词以内。");
+  const spanLimit = matchSpanLimit(a.length);
+  const substitutionCost = (sourceIndex: number, spokenIndex: number) =>
+    Number(
+      a[sourceIndex] !== b[spokenIndex] ||
+        Math.abs(sourceIndex - spokenIndex) > spanLimit,
+    );
   const dp = Array.from(
     { length: a.length + 1 },
     () => new Uint16Array(b.length + 1),
@@ -50,7 +61,7 @@ export function compare(expected: string, actual: string) {
       dp[i][j] = Math.min(
         dp[i - 1][j] + 1,
         dp[i][j - 1] + 1,
-        dp[i - 1][j - 1] + Number(a[i - 1] !== b[j - 1]),
+        dp[i - 1][j - 1] + substitutionCost(i - 1, j - 1),
       );
   const diff: Diff[] = [];
   let i = a.length,
@@ -59,10 +70,10 @@ export function compare(expected: string, actual: string) {
     if (
       i &&
       j &&
-      dp[i][j] === dp[i - 1][j - 1] + Number(a[i - 1] !== b[j - 1])
+      dp[i][j] === dp[i - 1][j - 1] + substitutionCost(i - 1, j - 1)
     ) {
       diff.push({
-        type: a[i - 1] === b[j - 1] ? "correct" : "wrong",
+        type: substitutionCost(i - 1, j - 1) === 0 ? "correct" : "wrong",
         expected: a[--i],
         actual: b[--j],
       });

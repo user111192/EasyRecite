@@ -710,6 +710,8 @@ function App() {
                     </div>
                     <p className="result-note">
                       保留原文标点、空格和换行，但不参与比较；忽略英文大小写，中文按字、英文按词比较。识别结果可能有误，可手动修正后重新检查。
+                      相同字词的位置跨度超过原文的 5% 或 20
+                      个字词（取较大值）时，也会按错误处理。
                     </p>
                     {!isLivePreview && result && (
                       <div className="ai-review">
