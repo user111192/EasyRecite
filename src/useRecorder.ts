@@ -28,6 +28,7 @@ export function useRecorder(
     "idle" | "starting" | "recording" | "stopping"
   >("idle");
   const [error, setError] = useState(""),
+    [canResume, setCanResume] = useState(false),
     [audio, setAudio] = useState(""),
     [seconds, setSeconds] = useState(0),
     [interim, setInterim] = useState("");
@@ -83,8 +84,9 @@ export function useRecorder(
     const id = setInterval(() => setSeconds((s) => s + 1), 1000);
     return () => clearInterval(id);
   }, [status]);
-  async function start(lang: string) {
+  async function start(lang: string, resume = false) {
     setError("");
+    setCanResume(false);
     const speechWindow = window as unknown as {
       SpeechRecognition?: new () => Recognition;
       webkitSpeechRecognition?: new () => Recognition;
@@ -109,11 +111,13 @@ export function useRecorder(
         return;
       }
       stream.current = mic;
-      if (url.current) URL.revokeObjectURL(url.current);
-      setAudio("");
-      full.current = "";
-      change.current("");
-      setSeconds(0);
+      if (!resume) {
+        if (url.current) URL.revokeObjectURL(url.current);
+        setAudio("");
+        full.current = "";
+        change.current("");
+        setSeconds(0);
+      }
       setInterim("");
       const chunks: BlobPart[] = [];
       const media = new MediaRecorder(mic);
@@ -158,6 +162,7 @@ export function useRecorder(
           "audio-capture": "无法访问麦克风，请检查设备是否可用。",
           "language-not-supported": "当前语音服务不支持所选语言。",
         };
+        setCanResume(e.error === "network");
         setError(messages[e.error] || `语音识别已中断（${e.error}），请重试。`);
         finish();
       };
@@ -179,5 +184,5 @@ export function useRecorder(
       );
     }
   }
-  return { status, error, audio, seconds, interim, start, stop };
+  return { status, error, canResume, audio, seconds, interim, start, stop };
 }

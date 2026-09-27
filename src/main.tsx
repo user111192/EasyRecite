@@ -600,7 +600,19 @@ function App() {
               {(recording.error || notice) && (
                 <div className="alert" role="alert">
                   <Info size={17} />
-                  {recording.error || notice}
+                  <span>{recording.error || notice}</span>
+                  {recording.canResume && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setResult(null);
+                        recording.start(lang, true);
+                      }}
+                    >
+                      <Mic size={15} />
+                      继续背诵
+                    </button>
+                  )}
                 </div>
               )}
               <section className="card feedback">

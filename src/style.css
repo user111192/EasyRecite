@@ -632,6 +632,19 @@ footer {
   margin-top: 20px;
   font-size: 12px;
 }
+.alert > span {
+  flex: 1;
+}
+.alert button {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 11px;
+  color: #fff;
+  background: #7b6acb;
+  border-radius: 6px;
+}
 .manual {
   padding: 20px 24px;
 }
