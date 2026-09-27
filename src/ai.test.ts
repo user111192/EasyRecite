@@ -39,6 +39,8 @@ test("发送兼容 Chat Completions 的请求并读取结果", async () => {
     "Bearer key",
   );
   assert.match(String(request?.body), /你号/);
+  assert.match(String(request?.body), /更像识别错误/);
+  assert.match(String(request?.body), /更像真实遗忘/);
 });
 
 test("显示兼容 API 返回的错误信息", async () => {
